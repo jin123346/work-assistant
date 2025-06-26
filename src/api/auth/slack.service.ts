@@ -166,31 +166,239 @@ export const sendSimpleMessage = async ({
       }
 };
 
+//어제한일 
 export const getGithubActivitySummary = async (githubUsername: string, githubToken: string)=>{
-    const yesterday = subDays(new Date(),1);
-    const since = startOfDay(yesterday).toISOString();
-    const until = endOfDay(yesterday).toISOString();
+  const today = new Date();
 
-    const eventUrl = `https://api.github.com/users/${githubUsername}/events`;
+  const kstToday = new Date(today.getTime() + (9 * 60 * 60 * 1000)); // UTC → KST 보정
+  const kstYear = kstToday.getUTCFullYear();
+  const kstMonth = kstToday.getUTCMonth();
+  const kstDate = kstToday.getUTCDate() - 1;
+  const utcStartOfYesterday = new Date(Date.UTC(kstYear, kstMonth, kstDate, 0 - 9, 0, 0));
+  const utcEndOfYesterday = new Date(Date.UTC(kstYear, kstMonth, kstDate, 23 - 9, 59, 59, 999));
+
+  console.log("어제 날짜 범위 (UTC):", utcStartOfYesterday.toISOString(), "~", utcEndOfYesterday.toISOString());
+
+  console.log('token : ',githubToken);
+
+
+  //  const eventUrl = `https://api.github.com/repos/jin123346/work-assistant/events`;
+    const eventUrl = `https://api.github.com/user/repos?visibility=all&affiliation=owner,collaborator,organization_member&per_page=100&page=1`;
+    console.log(eventUrl)
+    const repoList = [];
 
     const response = await axios.get(eventUrl,{
       headers:{
         Authorization : `Bearer ${githubToken}`,
-        Accept : 'application/vnd.github.v3+json',
+        Accept : 'application/vnd.github+json',
 
       }
     });
+    const eventList: any[] = [] ; 
 
-    const filteredEvents = response.data.filter((event: any) =>{
-      const createdAt = new Date(event.created_at);
-      return createdAt >= new Date(since) && createdAt <= new Date(until);
+    for( const repo of response.data){
+      repoList.push(repo.name);
+      const respoURL = `https://api.github.com/repos/${repo.full_name}/events`;
+
+      try{
+        const res = await axios.get(respoURL, {
+            headers: {
+              Authorization: `Bearer ${githubToken}`,
+              Accept: 'application/vnd.github+json',
+            },
+          });
+        eventList.push(...res.data);
+
+      }catch(err){
+        console.error(`!${repo.name} 이벤트 조회 실패`, err);
+      }
+    }
+
+    const filteredEvents = eventList.filter((event: any) => {
+      const time = new Date(event.created_at);
+      return time >= utcStartOfYesterday && time <= utcEndOfYesterday;
     });
 
+    console.log('filtered Event : ',filteredEvents);
+
     const summary = filteredEvents.map((event: any) => {
-    return `📌 ${event.type} - ${event.repo.name}`;
-  }).join('\n');
+        if (event.type === 'PushEvent' && event.payload?.commits?.length) {
+          const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+          const branch = event.payload.ref?.replace('refs/heads/', '');
+          return `📌 Push - ${event.repo.name} (${branch})
+      - ${event.payload.commits.map((c: any) =>` • ${c.message}`).join('\n- ')}
+      🔗 https://github.com/${event.repo.name}/commit/${event.payload.commits[0].sha}
+      🕒 ${date}`;
+        } else if (event.type === 'CreateEvent') {
+          const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+          const refType = event.payload.ref_type;
+          const ref = event.payload.ref || '';
+          return `📎 Create - ${refType} ${ref} @ ${event.repo.name}
+      🕒 ${date}`;
+        } else if (event.type === 'PullRequestEvent') {
+            const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+            const action = event.payload.action;
+            const pr = event.payload.pull_request;
+            const prTitle = pr?.title || 'No title';
+            const prUrl = pr?.html_url || '';
+
+            return `📌 PullRequest ${action.toUpperCase()} - ${event.repo.name}
+          • ${prTitle}
+          🔗 ${prUrl}
+          🕒 ${date}`;
+          }else if (event.type === 'IssueCommentEvent') {
+              const comment = event.payload.comment;
+              const issue = event.payload.issue;
+              const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+              return `💬 Issue Comment - ${event.repo.name}
+              • ${comment?.body?.slice(0, 100) || 'No content'}...
+              🔗 ${comment?.html_url || ''}
+              🕒 ${date}`;
+            } else if (event.type === 'PullRequestReviewCommentEvent') {
+              const comment = event.payload.comment;
+              const pr = event.payload.pull_request;
+              const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+              return `📝 PR Review Comment - ${event.repo.name}
+              • ${comment?.body?.slice(0, 100) || 'No content'}...
+              🔗 ${comment?.html_url || ''}
+              🕒 ${date}`;
+            } else if (event.type === 'CommitCommentEvent') {
+              const comment = event.payload.comment;
+              const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+              return `🧾 Commit Comment - ${event.repo.name}
+              • ${comment?.body?.slice(0, 100) || 'No content'}...
+              🔗 ${comment?.html_url || ''}
+              🕒 ${date}`;
+            }else {
+            const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+            return `📌 ${event.type} - ${event.repo.name}\n  🕒 ${date}`;
+          }
+      }).filter(Boolean).join('\n\n');
+
+    // const summary = filteredEvents.map((event: any) => {
+    //   if (event.type === 'PushEvent') {
+    //       const commits = event.payload.commits.map((commit: any) => {
+    //       const shortUrl = commit.url.replace('api.github.com/repos', 'github.com').replace('/commits/', '/commit/');
+    //       const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+    //       return `- ${commit.message}\n  🔗 ${shortUrl}\n  🕒 ${date}`;
+    //     }).join('\n');
+    //     return `📌 PushEvent - ${event.repo.name}\n${commits}`;
+    //   } else {
+    //     const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    //     return `📌 ${event.type} - ${event.repo.name}\n  🕒 ${date}`;
+    //   }
+    // }).join('\n\n');
 
   return summary || '어제 활동 내역이 없습니다.'
 };
+
+
+//오늘 한일 
+export const getTodayGithubActivitySummary = async (githubUsername: string, githubToken: string)=>{
+    const today = new Date();
+    const since = startOfDay(today).toISOString();
+    const until = endOfDay(today).toISOString();
+    console.log( '오늘 : ',today);
+    console.log('token : ',githubToken);
+
+    // const eventUrl = `https://api.github.com/repos/jin123346/work-assistant/commits`;
+    const eventUrl = `https://api.github.com/users/${githubUsername}/events?per_page=100`;
+
+    
+    try{
+        const response = await axios.get(eventUrl,{
+            headers:{
+              Authorization : `Bearer ${githubToken}`,
+              Accept : 'application/vnd.github+json',
+
+            }
+          });
+          console.log('깃data', response.data);
+          const filteredEvents = response.data.filter((event: any) =>{
+            const createdAt = new Date(event.created_at);
+            return createdAt >= new Date(since) && createdAt <= new Date(until);
+          });
+
+         const summary = filteredEvents.map((event: any) => {
+        if (event.type === 'PushEvent' && event.payload?.commits?.length) {
+          const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+          const branch = event.payload.ref?.replace('refs/heads/', '');
+          return `📌 Push - ${event.repo.name} (${branch})
+      - ${event.payload.commits.map((c: any) =>` • ${c.message}`).join('\n- ')}
+      🔗 https://github.com/${event.repo.name}/commit/${event.payload.commits[0].sha}
+      🕒 ${date}`;
+        } else if (event.type === 'CreateEvent') {
+          const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+          const refType = event.payload.ref_type;
+          const ref = event.payload.ref || '';
+          return `📎 Create - ${refType} ${ref} @ ${event.repo.name}
+      🕒 ${date}`;
+        } else if (event.type === 'PullRequestEvent') {
+            const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+            const action = event.payload.action;
+            const pr = event.payload.pull_request;
+            const prTitle = pr?.title || 'No title';
+            const prUrl = pr?.html_url || '';
+
+            return `📌 PullRequest ${action.toUpperCase()} - ${event.repo.name}
+          • ${prTitle}
+          🔗 ${prUrl}
+          🕒 ${date}`;
+          }else if (event.type === 'IssueCommentEvent') {
+              const comment = event.payload.comment;
+              const issue = event.payload.issue;
+              const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+              return `💬 Issue Comment - ${event.repo.name}
+              • ${comment?.body?.slice(0, 100) || 'No content'}...
+              🔗 ${comment?.html_url || ''}
+              🕒 ${date}`;
+            } else if (event.type === 'PullRequestReviewCommentEvent') {
+              const comment = event.payload.comment;
+              const pr = event.payload.pull_request;
+              const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+              return `📝 PR Review Comment - ${event.repo.name}
+              • ${comment?.body?.slice(0, 100) || 'No content'}...
+              🔗 ${comment?.html_url || ''}
+              🕒 ${date}`;
+            } else if (event.type === 'CommitCommentEvent') {
+              const comment = event.payload.comment;
+              const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+              return `🧾 Commit Comment - ${event.repo.name}
+              • ${comment?.body?.slice(0, 100) || 'No content'}...
+              🔗 ${comment?.html_url || ''}
+              🕒 ${date}`;
+            }else {
+            const date = new Date(event.created_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+            return `📌 ${event.type} - ${event.repo.name}\n  🕒 ${date}`;
+          }
+      }).filter(Boolean).join('\n\n');
+
+      return summary || '오늘 활동 내역이 없습니다.'
+
+    }catch (err) {
+        console.error('GitHub API 호출 실패:', err);
+
+    }
+
+   
+
+  
+};
+
+
+function convertUTCToKST(utcDateString: string): Date {
+  const utcDate = new Date(utcDateString);
+  return new Date(utcDate.getTime() + 9 * 60 * 60 * 1000); // KST = UTC + 9
+}
+
 
 
