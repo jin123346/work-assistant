@@ -52,52 +52,67 @@ router.post('/commons', async(req,res)=>{
 
         }else if(command === '/어제한일'){
 
-            const user = (req as any).user;
-            
-            //github 연동 확인 
-            if(!user || !user.githubUsername || !user.githubToken){
-               await sendSlackDM({
-                    slackId: user_id,
-                    slackToken: user.slackToken,
-                    text: 'GitHub 연동 정보가 없습니다. 먼저 연동해주세요.',
+            if (!user?.githubUsername || !user?.githubToken) {
+                await sendSlackDM({
+                slackId: user_id,
+                slackToken: user.slackToken,
+                text: '❗ GitHub 연동 정보가 없습니다. 먼저 연동해주세요.',
                 });
-                res.status(200).end();
-                return;
+                return res.status(200).end();
             }
 
-            const githubUsername = user.githubUsername;
-            const githubToken = user.githubToken;
+            res.status(200).send('🛠 데이터를 수집 중입니다. 잠시만 기다려주세요...');
 
-            const yesterdayActivities = await getGithubActivitySummary(githubUsername,githubToken);
-            console.log('어제 활동 내역 : ',yesterdayActivities);
+            try {
+                const result = await getGithubActivitySummary(user.githubUsername, user.githubToken);
+                console.log('어제 활동 내역 : ', result);
 
+                await sendSlackDM({
+                slackId: user.slackId,
+                slackToken: user.slackToken,
+                text: result || '어제 활동 내역이 없습니다.',
+                });
+            } catch (err) {
+                console.error('❌ 어제한일 에러:', err);
+                await sendSlackDM({
+                slackId: user.slackId,
+                slackToken: user.slackToken,
+                text: '❗ GitHub 데이터를 불러오는 중 오류가 발생했습니다.',
+                });
+            }
 
-            res.status(200).end();
             return;
 
-
         }else if(command === '/오늘한일'){
-                const user = (req as any).user;
-            
-            //github 연동 확인 
-            if(!user || !user.githubUsername || !user.githubToken){
-               await sendSlackDM({
-                    slackId: user_id,
-                    slackToken: user.slackToken,
-                    text: 'GitHub 연동 정보가 없습니다. 먼저 연동해주세요.',
+            if (!user?.githubUsername || !user?.githubToken) {
+                await sendSlackDM({
+                slackId: user_id,
+                slackToken: user.slackToken,
+                text: '❗ GitHub 연동 정보가 없습니다. 먼저 연동해주세요.',
                 });
-                res.status(200).end();
-                return;
+                return res.status(200).end();
             }
 
-            const githubUsername = user.githubUsername;
-            const githubToken = user.githubToken;
+            res.status(200).send('🛠 데이터를 수집 중입니다. 잠시만 기다려주세요...');
 
-            const todayActivities = await getTodayGithubActivitySummary(githubUsername,githubToken);
-            console.log('오늘 활동 내역 : ',todayActivities);
+            try {
+                const result = await getTodayGithubActivitySummary(user.githubUsername, user.githubToken);
+                console.log('오늘 활동 내역 : ', result);
 
+                await sendSlackDM({
+                slackId: user.slackId,
+                slackToken: user.slackToken,
+                text: result || '오늘 활동 내역이 없습니다.',
+                });
+            } catch (err) {
+                console.error('❌ 오늘한일 에러:', err);
+                await sendSlackDM({
+                slackId: user.slackId,
+                slackToken: user.slackToken,
+                text: '❗ GitHub 데이터를 불러오는 중 오류가 발생했습니다.',
+                });
+            }
 
-            res.status(200).end();
             return;
         }
 
