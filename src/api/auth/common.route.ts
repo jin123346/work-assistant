@@ -1,6 +1,6 @@
 import express from 'express';
 import axios from 'axios';
-import { checkGithubStatus, getGithubActivitySummary, sendGithubConnectMessage, sendSimpleMessage, sendSlackDM } from './slack.service';
+import { checkGithubStatus, getGithubActivitySummary, getTodayGithubActivitySummary, sendGithubConnectMessage, sendSimpleMessage, sendSlackDM } from './slack.service';
 import {User} from '../../models/user.model';
 import dotenv from 'dotenv';
 
@@ -76,6 +76,29 @@ router.post('/commons', async(req,res)=>{
             return;
 
 
+        }else if(command === '/오늘한일'){
+                const user = (req as any).user;
+            
+            //github 연동 확인 
+            if(!user || !user.githubUsername || !user.githubToken){
+               await sendSlackDM({
+                    slackId: user_id,
+                    slackToken: user.slackToken,
+                    text: 'GitHub 연동 정보가 없습니다. 먼저 연동해주세요.',
+                });
+                res.status(200).end();
+                return;
+            }
+
+            const githubUsername = user.githubUsername;
+            const githubToken = user.githubToken;
+
+            const todayActivities = await getTodayGithubActivitySummary(githubUsername,githubToken);
+            console.log('오늘 활동 내역 : ',todayActivities);
+
+
+            res.status(200).end();
+            return;
         }
 
         res.status(400).send('지원하지 않는 명령어입니다.');

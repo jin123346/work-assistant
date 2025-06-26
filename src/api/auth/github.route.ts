@@ -19,7 +19,7 @@ router.get('/login' , (req,res)=>{
     console.log(`${clientId}`);
     const slackId = req.query.slackId as string; 
 
-    const redirectUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo%20user&redirect_uri=${severBaseURL}/api/auth/github/callback?slackId=${slackId}`;
+    const redirectUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo%20read:user%20user:email&redirect_uri=${severBaseURL}/api/auth/github/callback?slackId=${slackId}`;
     res.redirect(redirectUrl);
 })
 
