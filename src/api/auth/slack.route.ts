@@ -2,7 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { User } from '../../models/user.model';
-import {sendGithubConnectMessage} from '../auth/slack.service';
+import {sendGithubConnectMessage} from '../../services/slack.service';
+import { SlackIntegration } from '../../models/slack.model';
 
 dotenv.config();
 const router= express.Router();
@@ -21,7 +22,7 @@ router.get('/login',(req,res)=>{
      res.redirect(url);
 })
 
-router.get('/callback', async (req,res)=>{
+router.get('/callback', async (req,res)=> {
     const code = req.query.code;
 
     try{
@@ -48,14 +49,14 @@ router.get('/callback', async (req,res)=>{
         console.log('Slack token response:', tokenRes.data);
 
         
-        // if (!tokenRes.data.ok) {
-        //     console.error('Slack token response error:', tokenRes.data.error);
-        //     return res.status(400).send('Slack 인증 실패: ' + tokenRes.data.error);
-        // }
+        if (!tokenRes.data.ok) {
+            console.error('Slack token response error:', tokenRes.data.error);
+            return res.status(400).send('Slack 인증 실패: ' + tokenRes.data.error);
+        }
 
 
-       const user =  await User.findOneAndUpdate(
-            {slackId: authed_user.id},
+       const slackUser =  await SlackIntegration.findOneAndUpdate(
+            {userId:  req.user , slackId: authed_user.id, },
             {
                 slackId: authed_user.id,
                 slackToken: access_token,
@@ -64,20 +65,11 @@ router.get('/callback', async (req,res)=>{
             {upsert: true, new: true
              }
         );
-        console.log('저장된 유저:', user);
-
-        if(!user.githubUsername){
-            await sendGithubConnectMessage({
-                slackId :  user.slackId!,
-                slackToken : user.slackToken!,
-                status : false,
-            });
-        }
-
+        console.log('저장된 유저:', slackUser);
 
 
          res.send('slack 연동 완료!');
-
+        return;
 
     }catch(err){
         console.log(err);

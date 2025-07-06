@@ -2,8 +2,9 @@ import express from 'express';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { User } from '../../models/user.model';
-import { sendSlackDM } from './slack.service';
+import { sendSlackDM } from '../../services/slack.service';
 import { Request, Response } from 'express';
+import { GitHubIntegration } from '../../models/github.model';
 
 dotenv.config();
 const router= express.Router();
@@ -49,32 +50,15 @@ router.get('/callback',async ( req: Request, res:Response )=> {
 
         const githubUsername = userRes.data.login;
 
-        const user = await User.findOne({ slackId });
-
-
-         if (!user) {
-              res.status(404).send('슬랙 유저를 찾을 수 없습니다.');
-              return;
-        }
-        console.log('slack user : ', user);
-        user!.githubUsername = githubUsername;
-        user!.githubToken = accessToken;
-        await user!.save();
-
-        await sendSlackDM({slackId : user!.slackId! ,slackToken : user!.slackToken! ,text : 'GitHub 연동되었습니다.'});
-        res.send(`
-        <html>
-            <head>
-            <meta charset="utf-8" />
-            </head>
-            <body>
-            <script>
-                alert("✅ GitHub 연동이 완료되었습니다!");
-                window.close(); // Slack in-app browser 닫기
-            </script>
-            </body>
-        </html>
-        `);        
+          const githubUser = await GitHubIntegration.findOneAndUpdate({ userId: req.user },
+            {
+                githubUsername: githubUsername ,
+                githubToken: accessToken,
+                createdAt: Date.now 
+            },
+             {upsert: true, new: true
+             }
+        );
         return ;
 
     }catch(err){

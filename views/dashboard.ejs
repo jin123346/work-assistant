@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WorkFlow Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f8fafc;
+            color: #334155;
+            line-height: 1.6;
+        }
+
+        .dashboard {
+            display: flex;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
+            color: white;
+            padding: 2rem 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px;
+            overflow-y: auto;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar-header {
+            padding: 0 2rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .logo::before {
+            content: "⚡";
+            font-size: 1.8rem;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .user-details h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .user-details p {
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .nav-menu {
+            padding: 2rem 0;
+        }
+
+        .nav-section {
+            margin-bottom: 2rem;
+        }
+
+        .nav-section h4 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.6;
+            margin-bottom: 1rem;
+            padding: 0 2rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 2rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-left-color: #3b82f6;
+        }
+
+        .nav-icon {
+            font-size: 1.2rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* 메인 컨텐츠 */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            width: 100%;
+        }
+
+        .mobile-menu-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: background 0.2s;
+        }
+
+        .mobile-menu-btn:hover {
+            background: #2563eb;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            gap: 1rem;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .top-bar h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .sync-status {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #f1f5f9;
+            border-radius: 2rem;
+            font-size: 0.85rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-connected { background: #10b981; }
+        .status-disconnected { background: #ef4444; }
+
+        /* 대시보드 그리드 */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .dashboard-card {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-action {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .card-action:hover {
+            background: #2563eb;
+        }
+
+        /* 오늘의 업무 */
+        .today-tasks {
+            margin-bottom: 1.5rem;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .task-item:hover {
+            border-color: #3b82f6;
+            background: #f8fafc;
+        }
+
+        .task-checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .task-checkbox.checked {
+            background: #3b82f6;
+            border-color: #3b82f6;
+            position: relative;
+        }
+
+        .task-checkbox.checked::after {
+            content: "✓";
+            color: white;
+            font-size: 12px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .task-content {
+            flex: 1;
+        }
+
+        .task-title {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .task-meta {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        .task-priority {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .priority-high { background: #fef2f2; color: #dc2626; }
+        .priority-medium { background: #fef3c7; color: #d97706; }
+        .priority-low { background: #f0f9ff; color: #0284c7; }
+
+        /* 최근 활동 */
+        .activity-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .github-icon { background: #f3f4f6; color: #374151; }
+        .slack-icon { background: #e0f2fe; color: #0277bd; }
+        .calendar-icon { background: #fef3c7; color: #d97706; }
+
+        .activity-content h4 {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .activity-content p {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 0.25rem;
+        }
+
+        .activity-time {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        /* 하단 그리드 */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        /* 일정 관리 */
+        .calendar-widget {
+            margin-bottom: 1rem;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .calendar-nav {
+            background: none;
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+
+        .event-item {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-left: 3px solid #3b82f6;
+            background: #f8fafc;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .event-time {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 500;
+            min-width: 60px;
+        }
+
+        .event-content h4 {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .event-content p {
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+
+        /* 업무 일지 */
+        .journal-form {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        /* 반응형 */
+        @media (min-width: 1025px) {
+            .sidebar {
+                position: relative;
+                transform: translateX(0);
+                width: 280px;
+                flex-shrink: 0;
+            }
+            
+            .dashboard {
+                display: flex;
+            }
+            
+            .mobile-menu-btn {
+                display: none;
+            }
+            
+            .sidebar-overlay {
+                display: none;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid,
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .top-bar {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            
+            .top-bar-left {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .sync-status {
+                width: 100%;
+                justify-content: space-between;
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- 사이드바 오버레이 -->
+        <div class="sidebar-overlay" onclick="closeSidebar()"></div>
+        
+        <!-- 사이드바 -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">WorkFlow</div>
+                <div class="user-info">
+                     <% if (currentUser) { %>
+                        <div class="user-avatar"><%= currentUser.name.charAt(0) %></div>
+                        <div class="user-details">
+                       
+                            <h3><%= currentUser.name %></h3>
+                            <p><%= currentUser.email %></p>
+                        <% } %>
+                        
+                    </div>
+                </div>
+            </div>
+            
+            <div class="nav-menu">
+                <div class="nav-section">
+                    <h4>메인</h4>
+                    <a href="#" class="nav-item active">
+                        <span class="nav-icon">🏠</span>
+                        대시보드
+                    </a>
+                    <a href="#" class="nav-item">
+                        <span class="nav-icon">📝</span>
+                        업무 일지
+                    </a>
+                    <a href="#" class="nav-item">
+                        <span class="nav-icon">📊</span>
+                        통계
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <h4>연동 서비스</h4>
+                    <a href="/api/auth/slack/login" target="_blank" rel="noopener noreferrer"  class="nav-item">
+                        <span class="nav-icon">💬</span>
+                        슬랙
+                    </a>
+                    <a href="#" class="nav-item">
+                        <span class="nav-icon">🐙</span>
+                        깃허브
+                    </a>
+                    <a href="#" class="nav-item">
+                        <span class="nav-icon">📅</span>
+                        구글 캘린더
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <h4>설정</h4>
+                    <a href="#" class="nav-item">
+                        <span class="nav-icon">⚙️</span>
+                        환경설정
+                    </a>
+                    <a href="#" class="nav-item">
+                        <span class="nav-icon">🚪</span>
+                        로그아웃
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 메인 컨텐츠 -->
+        <main class="main-content">
+            <!-- 상단 바 -->
+            <div class="top-bar">
+                <div class="top-bar-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()">
+                        ☰
+                    </button>
+                    <h1>오늘의 업무 현황</h1>
+                </div>
+                <div class="sync-status">
+                    <div class="status-item">
+                        <div class="status-dot status-connected"></div>
+                        슬랙 연결됨
+                    </div>
+                    <div class="status-item">
+                        <div class="status-dot status-connected"></div>
+                        깃허브 연결됨
+                    </div>
+                    <div class="status-item">
+                        <div class="status-dot status-disconnected"></div>
+                        구글 캘린더 연결 필요
+                    </div>
+                </div>
+            </div>
+
+            <!-- 대시보드 그리드 -->
+            <div class="dashboard-grid">
+                <!-- 오늘의 업무 -->
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            ✅ 오늘의 업무
+                        </h2>
+                        <button class="card-action" onclick="addNewTask()">새 업무 추가</button>
+                    </div>
+                    
+                    <div class="today-tasks">
+                        <div class="task-item">
+                            <div class="task-checkbox" onclick="toggleTask(this)"></div>
+                            <div class="task-content">
+                                <div class="task-title">사용자 인증 API 개발</div>
+                                <div class="task-meta">GitHub Issue #123 • 예상 시간: 4시간</div>
+                            </div>
+                            <div class="task-priority priority-high">긴급</div>
+                        </div>
+                        
+                        <div class="task-item">
+                            <div class="task-checkbox checked" onclick="toggleTask(this)"></div>
+                            <div class="task-content">
+                                <div class="task-title">데이터베이스 스키마 설계</div>
+                                <div class="task-meta">완료됨 • 소요 시간: 2시간</div>
+                            </div>
+                            <div class="task-priority priority-medium">보통</div>
+                        </div>
+                        
+                        <div class="task-item">
+                            <div class="task-checkbox" onclick="toggleTask(this)"></div>
+                            <div class="task-content">
+                                <div class="task-title">코드 리뷰 및 피드백</div>
+                                <div class="task-meta">PR #456 • 예상 시간: 1시간</div>
+                            </div>
+                            <div class="task-priority priority-low">낮음</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 최근 활동 -->
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            📈 최근 활동
+                        </h2>
+                    </div>
+                    
+                    <div class="activity-list">
+                        <div class="activity-item">
+                            <div class="activity-icon github-icon">🐙</div>
+                            <div class="activity-content">
+                                <h4>Pull Request 생성</h4>
+                                <p>feature/user-auth 브랜치를 main으로 머지 요청</p>
+                                <div class="activity-time">30분 전</div>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon slack-icon">💬</div>
+                            <div class="activity-content">
+                                <h4>슬랙 메시지</h4>
+                                <p>#dev-team 채널에서 코드 리뷰 요청</p>
+                                <div class="activity-time">1시간 전</div>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon calendar-icon">📅</div>
+                            <div class="activity-content">
+                                <h4>회의 일정</h4>
+                                <p>오후 3시 팀 스탠드업 미팅 예정</p>
+                                <div class="activity-time">2시간 후</div>
+                            </div>
+                        </div>
+                        
+                        <div class="activity-item">
+                            <div class="activity-icon github-icon">🐙</div>
+                            <div class="activity-content">
+                                <h4>커밋 푸시</h4>
+                                <p>사용자 인증 모듈 초기 구현 완료</p>
+                                <div class="activity-time">3시간 전</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 하단 그리드 -->
+            <div class="bottom-grid">
+                <!-- 일정 관리 -->
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            📅 오늘 일정
+                        </h2>
+                        <button class="card-action" onclick="syncCalendar()">캘린더 동기화</button>
+                    </div>
+                    
+                    <div class="calendar-widget">
+                        <div class="event-item">
+                            <div class="event-time">09:00</div>
+                            <div class="event-content">
+                                <h4>데일리 스크럼</h4>
+                                <p>팀 전체 진행상황 공유</p>
+                            </div>
+                        </div>
+                        
+                        <div class="event-item">
+                            <div class="event-time">15:00</div>
+                            <div class="event-content">
+                                <h4>프로젝트 리뷰 미팅</h4>
+                                <p>클라이언트와 중간 점검</p>
+                            </div>
+                        </div>
+                        
+                        <div class="event-item">
+                            <div class="event-time">17:30</div>
+                            <div class="event-content">
+                                <h4>코드 리뷰 세션</h4>
+                                <p>동료 개발자와 코드 품질 검토</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 업무 일지 -->
+                <div class="dashboard-card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            📝 업무 일지 작성
+                        </h2>
+                    </div>
+                    
+                    <div class="journal-form">
+                        <div class="form-group">
+                            <label class="form-label">오늘 완료한 업무</label>
+                            <textarea class="form-textarea" placeholder="오늘 수행한 주요 업무를 입력하세요..."></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">내일 계획</label>
+                            <textarea class="form-textarea" placeholder="내일 수행할 업무를 입력하세요..."></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">특이사항 / 이슈</label>
+                            <textarea class="form-textarea" placeholder="특별히 기록할 내용이나 발생한 이슈를 입력하세요..."></textarea>
+                        </div>
+                        
+                        <button class="btn-primary" onclick="saveJournal()">일지 저장</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 업무 체크박스 토글
+        function toggleTask(checkbox) {
+            checkbox.classList.toggle('checked');
+            
+            // 실제 구현에서는 서버에 상태 업데이트 요청
+            const taskItem = checkbox.closest('.task-item');
+            const isCompleted = checkbox.classList.contains('checked');
+            
+            if (isCompleted) {
+                taskItem.style.opacity = '0.7';
+                console.log('업무 완료:', taskItem.querySelector('.task-title').textContent);
+            } else {
+                taskItem.style.opacity = '1';
+                console.log('업무 미완료:', taskItem.querySelector('.task-title').textContent);
+            }
+        }
+
+        // 새 업무 추가
+        function addNewTask() {
+            const taskTitle = prompt('새 업무 제목을 입력하세요:');
+            if (taskTitle) {
+                console.log('새 업무 추가:', taskTitle);
+                // 실제 구현에서는 DOM에 새 업무 항목 추가 및 서버 저장
+                alert('새 업무가 추가되었습니다: ' + taskTitle);
+            }
+        }
+
+        // 캘린더 동기화
+        function syncCalendar() {
+            console.log('구글 캘린더 동기화 시작');
+            // 실제 구현에서는 Google Calendar API 호출
+            alert('구글 캘린더와 동기화를 시작합니다.');
+        }
+
+        // 업무 일지 저장
+        function saveJournal() {
+            const completed = document.querySelectorAll('.form-textarea')[0].value;
+            const tomorrow = document.querySelectorAll('.form-textarea')[1].value;
+            const issues = document.querySelectorAll('.form-textarea')[2].value;
+            
+            if (!completed.trim()) {
+                alert('완료한 업무를 입력해주세요.');
+                return;
+            }
+            
+            const journalData = {
+                date: new Date().toISOString().split('T')[0],
+                completed: completed,
+                tomorrow: tomorrow,
+                issues: issues,
+                timestamp: new Date().toISOString()
+            };
+            
+            console.log('업무 일지 저장:', journalData);
+            // 실제 구현에서는 서버에 저장
+            alert('업무 일지가 저장되었습니다.');
+            
+            // 폼 초기화
+            document.querySelectorAll('.form-textarea').forEach(textarea => {
+                textarea.value = '';
+            });
+        }
+
+        // 네비게이션 활성화
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+
+                if(!href || href === "#"){
+                    e.preventDefault();
+                }
+
+                
+                // 기존 active 클래스 제거
+                document.querySelectorAll('.nav-item').forEach(nav => {
+                    nav.classList.remove('active');
+                });
+                
+                // 클릭된 아이템에 active 클래스 추가
+                this.classList.add('active');
+                
+                console.log('네비게이션 클릭:', this.textContent.trim());
+            });
+        });
+
+        // 실시간 시간 업데이트 (옵션)
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ko-KR');
+            // 필요시 시간 표시 요소 업데이트
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('대시보드 로드 완료');
+            
+            // 실제 구현에서는 여기서 서버에서 데이터 로드
+            // loadUserData();
+            // loadTasks();
+            // loadRecentActivity();
+            // loadCalendarEvents();
+        });
+
+        // 사이드바 토글
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            
+            if (sidebar.classList.contains('open')) {
+                closeSidebar();
+            } else {
+                openSidebar();
+            }
+        }
+
+        function openSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            
+            sidebar.classList.add('open');
+            overlay.classList.add('active');
+            document.body.style.overflow = 'hidden'; // 스크롤 방지
+        }
+
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+            document.body.style.overflow = ''; // 스크롤 복원
+        }
+
+        // 윈도우 리사이즈 대응
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 1024) {
+                // 데스크톱에서는 사이드바 자동으로 표시하고 오버레이 제거
+                closeSidebar();
+            }
+        });
+
+        // ESC 키로 사이드바 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSidebar();
+            }
+        });
+    </script>
+</body>
+</html>
